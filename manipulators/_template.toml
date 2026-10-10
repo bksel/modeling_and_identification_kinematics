@@ -1,0 +1,55 @@
+# Manipulator spec for `just walkthrough <name>`.
+# Every value is parsed by sympy: use names (q1, a1), numbers, pi, sqrt(), atan2(), ...
+# `deg` is pi/180, so "30*deg" works. x, y, z are reserved for the end-effector position.
+# Avoid the single-letter sympy names S, E, I, N, O, Q.
+
+name = "My manipulator"
+description = "One-paragraph description shown under the title."
+# figure = "figures/my_manipulator.png"   # optional: your sketch with frames assigned (relative to this file)
+
+joints = ["q1", "q2"]                       # joint variables, in DH-row order
+
+[constants]                                 # numeric link parameters, used only for plots and numeric IK
+a1 = 1.0
+a2 = 0.8
+
+[sample]                                    # configuration used for the frame plot; its position is the IK target
+q1 = "30*deg"
+q2 = "45*deg"
+
+# Schematic (optional): pose overrides the sample pose for the drawing only;
+# view is "auto" (top for planar arms, oblique otherwise), "top" or "oblique".
+# [schematic]
+# view = "auto"
+# [schematic.pose]
+# q1 = "90*deg"
+
+# One [[dh]] block per joint: theta, d, a, alpha (standard DH convention).
+[[dh]]
+theta = "q1"
+d = "0"
+a = "a1"
+alpha = "0"
+
+[[dh]]
+theta = "q2"
+d = "0"
+a = "a2"
+alpha = "0"
+
+# --- Inverse kinematics (optional section) -----------------------------------
+# A numeric damped-least-squares solve always runs. Optional knobs:
+# [ik]
+# damping = 0.05
+# [ik.initial_guess]
+# q1 = "10*deg"
+#
+# Closed-form solutions: intermediates are evaluated in order, then each
+# solution's assignments in order (later ones may use earlier joints).
+# [ik.intermediates]
+# D = "(x**2 + y**2 - a1**2 - a2**2) / (2*a1*a2)"
+#
+# [[ik.solution]]
+# name = "Elbow up"
+# q2 = "atan2(sqrt(1 - D**2), D)"
+# q1 = "atan2(y, x) - atan2(a2*sin(q2), a1 + a2*cos(q2))"

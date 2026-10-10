@@ -1,0 +1,39 @@
+name = "Planar 3R pendulum"
+description = "Three revolute joints with parallel axes. Position-only IK is redundant: three joints, two task-space coordinates."
+
+joints = ["q1", "q2", "q3"]
+
+[constants]
+a1 = 1.0
+a2 = 0.8
+a3 = 0.5
+
+[sample]
+q1 = "20*deg"
+q2 = "40*deg"
+q3 = "30*deg"
+
+[[dh]]
+theta = "q1"
+d = "0"
+a = "a1"
+alpha = "0"
+
+[[dh]]
+theta = "q2"
+d = "0"
+a = "a2"
+alpha = "0"
+
+[[dh]]
+theta = "q3"
+d = "0"
+a = "a3"
+alpha = "0"
+
+# start far from the sample pose so the numeric solution shows a different
+# configuration reaching the same point (redundancy)
+[ik.initial_guess]
+q1 = "90*deg"
+q2 = "-30*deg"
+q3 = "-60*deg"

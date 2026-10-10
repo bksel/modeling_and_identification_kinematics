@@ -1,0 +1,38 @@
+name = "TRR manipulator"
+# figure = "figures/trr.png"
+description = "A translational joint q1 along the vertical z0 axis, followed by two revolute joints: q2 about the vertical axis at the end of link a1, and q3 about a horizontal axis at the top of link a2."
+
+joints = ["q1", "q2", "q3"]
+
+[constants]
+a1 = 1.0
+a2 = 0.8
+a3 = 0.8
+
+[sample]
+q1 = "1.0"
+q2 = "30*deg"
+q3 = "-40*deg"
+
+# draw the schematic in the pose of the exercise sheet
+[schematic.pose]
+q2 = "0"
+q3 = "-25*deg"
+
+[[dh]]
+theta = "pi/2"
+d = "q1"
+a = "a1"
+alpha = "0"
+
+[[dh]]
+theta = "q2"
+d = "a2"
+a = "0"
+alpha = "pi/2"
+
+[[dh]]
+theta = "q3"
+d = "0"
+a = "a3"
+alpha = "0"

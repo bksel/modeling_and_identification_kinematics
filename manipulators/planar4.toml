@@ -1,0 +1,48 @@
+name = "Planar 4R pendulum"
+description = "Four revolute joints with parallel axes. Position-only IK is redundant: four joints, two task-space coordinates."
+
+joints = ["q1", "q2", "q3", "q4"]
+
+[constants]
+a1 = 1.0
+a2 = 0.8
+a3 = 0.6
+a4 = 0.4
+
+[sample]
+q1 = "15*deg"
+q2 = "30*deg"
+q3 = "30*deg"
+q4 = "20*deg"
+
+[[dh]]
+theta = "q1"
+d = "0"
+a = "a1"
+alpha = "0"
+
+[[dh]]
+theta = "q2"
+d = "0"
+a = "a2"
+alpha = "0"
+
+[[dh]]
+theta = "q3"
+d = "0"
+a = "a3"
+alpha = "0"
+
+[[dh]]
+theta = "q4"
+d = "0"
+a = "a4"
+alpha = "0"
+
+# start far from the sample pose so the numeric solution shows a different
+# configuration reaching the same point (redundancy)
+[ik.initial_guess]
+q1 = "90*deg"
+q2 = "-20*deg"
+q3 = "-40*deg"
+q4 = "-30*deg"

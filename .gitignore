@@ -1,0 +1,13 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# generated walkthroughs (just walkthrough / just all)
+build/
+out/
+
+# exploration notebook and course material
+*.ipynb
+.ipynb_checkpoints/
+*.pdf

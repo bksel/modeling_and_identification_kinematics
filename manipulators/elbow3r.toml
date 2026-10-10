@@ -1,0 +1,57 @@
+name = "3R elbow manipulator"
+description = "A base joint about the vertical z0 axis (column height d1), followed by two revolute joints with horizontal, parallel axes carrying links a2 and a3."
+
+joints = ["q1", "q2", "q3"]
+
+[constants]
+d1 = 1.0
+a2 = 1.0
+a3 = 0.8
+
+[sample]
+q1 = "30*deg"
+q2 = "40*deg"
+q3 = "-60*deg"
+
+[[dh]]
+theta = "q1"
+d = "d1"
+a = "0"
+alpha = "pi/2"
+
+[[dh]]
+theta = "q2"
+d = "0"
+a = "a2"
+alpha = "0"
+
+[[dh]]
+theta = "q3"
+d = "0"
+a = "a3"
+alpha = "0"
+
+# q1 points the arm's plane at the target; q2, q3 then solve a planar 2R
+# problem in that plane with horizontal reach r and height s above the shoulder.
+[ik.intermediates]
+r = "sqrt(x**2 + y**2)"
+s = "z - d1"
+D = "(r**2 + s**2 - a2**2 - a3**2) / (2*a2*a3)"
+
+[[ik.solution]]
+name = "Elbow branch q3 > 0"
+q1 = "atan2(y, x)"
+q3 = "atan2(sqrt(1 - D**2), D)"
+q2 = "atan2(s, r) - atan2(a3*sin(q3), a2 + a3*cos(q3))"
+
+[[ik.solution]]
+name = "Elbow branch q3 < 0"
+q1 = "atan2(y, x)"
+q3 = "atan2(-sqrt(1 - D**2), D)"
+q2 = "atan2(s, r) - atan2(a3*sin(q3), a2 + a3*cos(q3))"
+
+# draw the schematic with the arm in the y0-z0 plane (as on the exercise sheet)
+[schematic.pose]
+q1 = "90*deg"
+q2 = "55*deg"
+q3 = "-75*deg"
