@@ -1169,6 +1169,12 @@ $('show-frames').addEventListener('change', (ev) => { state.showFrames = ev.targ
 $('show-labels').addEventListener('change', (ev) => { state.showLabels = ev.target.checked; requestRender(); });
 $('show-trail').addEventListener('change', (ev) => { state.showTrail = ev.target.checked; state.trail = []; updateScene(); });
 
+// A reload can restore checkbox and radio state in the DOM; start from what the controls show.
+state.showFrames = $('show-frames').checked;
+state.showLabels = $('show-labels').checked;
+state.showTrail = $('show-trail').checked;
+state.mode = document.querySelector('input[name="mode"]:checked').value;
+
 applyTheme();
 const startId = MANIPULATORS.some((M) => M.id === DEFAULT_ID) ? DEFAULT_ID : MANIPULATORS[0].id;
 $('manip').value = startId;
