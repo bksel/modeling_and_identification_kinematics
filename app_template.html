@@ -1,0 +1,1145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DH Manipulator Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: instrument panel on the left, live 3-D stage filling the rest; stage on top on phones */
+  :root {
+    --bg: #e7ebef;
+    --panel: #f6f8fa;
+    --stage: #eef1f4;
+    --fg: #17212b;
+    --muted: #586472;
+    --line: #d2d9e0;
+    --accent: #2a78d6;
+    --accent-ink: #ffffff;
+    --ok: #16804f;
+    --bad: #c23b36;
+    --warn: #a3680a;
+    --grid-major: #c3cbd3;
+    --grid-minor: #dce1e6;
+    --font-head: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+    --font-ui: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    --font-math: "Cambria Math", "STIX Two Math", "Times New Roman", serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1318; --panel: #141b22; --stage: #10161c; --fg: #e3e8ed; --muted: #97a3af; --line: #26313b;
+      --accent: #4f97ec; --accent-ink: #0b1118; --ok: #3bb37a; --bad: #ec6a64; --warn: #e0a03a;
+      --grid-major: #2b353f; --grid-minor: #1b232b; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1318; --panel: #141b22; --stage: #10161c; --fg: #e3e8ed; --muted: #97a3af; --line: #26313b;
+    --accent: #4f97ec; --accent-ink: #0b1118; --ok: #3bb37a; --bad: #ec6a64; --warn: #e0a03a;
+    --grid-major: #2b353f; --grid-minor: #1b232b; color-scheme: dark;
+  }
+
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--font-ui); }
+  .app { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); height: 100%; }
+
+  .panel {
+    overflow: auto; background: var(--panel); border-right: 1px solid var(--line);
+    padding: 20px 20px 28px; display: flex; flex-direction: column; gap: 22px; min-width: 0;
+  }
+  .panel header h1 { font: 600 24px/1.1 var(--font-head); margin: 0; letter-spacing: 0.01em; text-wrap: balance; }
+  .panel header p { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; }
+  section { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  h2 {
+    font: 600 12px/1 var(--font-head); text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--muted); margin: 0;
+  }
+  .desc { margin: 0; color: var(--muted); font-size: 13.5px; }
+
+  select {
+    font: 500 15px var(--font-ui); color: var(--fg); background: var(--bg); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 10px; width: 100%;
+  }
+
+  /* exclusive FK / IK switch */
+  .seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 9px; padding: 3px; background: var(--bg); }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg label { text-align: center; padding: 7px 0; border-radius: 6px; cursor: pointer; font-weight: 500; }
+  .seg label small { display: block; font: 11px var(--font-mono); color: var(--muted); }
+  .seg input:checked + label { background: var(--accent); color: var(--accent-ink); }
+  .seg input:checked + label small { color: inherit; opacity: 0.8; }
+  .seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .ctl { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 10px; }
+  .ctl label { font-size: 14px; }
+  .ctl .sym { font: italic 17px var(--font-math); }
+  .ctl .kind { color: var(--muted); font-size: 12px; margin-left: 6px; }
+  .field { display: inline-flex; align-items: baseline; gap: 3px; }
+  .field input {
+    width: 8.5ch; font: 500 13px var(--font-mono); font-variant-numeric: tabular-nums; text-align: right;
+    color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px;
+  }
+  .field input:hover { border-color: var(--muted); }
+  .field input:focus-visible { border-color: var(--accent); }
+  .field .unit { font: 13px var(--font-mono); color: var(--muted); min-width: 1ch; }
+  .ctl input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 2px 0 0; }
+  .fixed { font: 13px var(--font-mono); color: var(--muted); margin: 0; }
+
+  .choices { display: flex; flex-direction: column; gap: 6px; }
+  .choice { display: flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; }
+  .choice input { accent-color: var(--accent); margin: 0; }
+  .choice .note { color: var(--muted); font-size: 12px; }
+  .toggles { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+  .families { display: flex; flex-direction: column; gap: 8px; }
+  .family { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+  .family .cond { font: italic 16px var(--font-math); }
+  .family .btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  .btn.small { font-size: 12.5px; padding: 4px 9px; }
+  .btn.small .sym { font: italic 14px var(--font-math); }
+  .msg { margin: 0; font-size: 13px; color: var(--warn); }
+
+  .readout { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font: 13px var(--font-mono); font-variant-numeric: tabular-nums; }
+  .readout dt { color: var(--muted); }
+  .readout dd { margin: 0; text-align: right; }
+  .matrix {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px 10px; padding: 4px 8px;
+    font: 12.5px var(--font-mono); font-variant-numeric: tabular-nums; text-align: right;
+    border-left: 1.5px solid var(--fg); border-right: 1.5px solid var(--fg); border-radius: 3px;
+  }
+  .scroll { overflow-x: auto; }
+  table.dh { border-collapse: collapse; width: 100%; font-size: 14px; }
+  table.dh th { font: 600 12px var(--font-head); color: var(--muted); text-align: center; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+  table.dh td { text-align: center; padding: 4px 6px; font-family: var(--font-math); font-style: italic; }
+  table.dh td:first-child { font-style: normal; font-family: var(--font-mono); color: var(--muted); }
+
+  .stage-wrap { position: relative; min-width: 0; min-height: 0; background: var(--stage); }
+  #stage { position: absolute; inset: 0; }
+  #stage canvas { display: block; width: 100%; height: 100%; }
+  #tags { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag {
+    position: absolute; font: italic 16px var(--font-math); color: var(--fg); white-space: nowrap;
+    transform: translate(18px, -130%);
+    text-shadow: 0 0 3px var(--stage), 0 0 3px var(--stage), 0 0 6px var(--stage);
+  }
+  .tag.axis { font-size: 14px; color: var(--muted); transform: translate(4px, -50%); }
+
+  .hud {
+    position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; gap: 6px;
+    background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 10px; font: 13px var(--font-mono); font-variant-numeric: tabular-nums;
+    max-width: calc(100% - 24px);
+  }
+  .hud .p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font: 500 12px var(--font-ui); padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; }
+  .chip.neutral { color: var(--muted); }
+  .chip.ok { color: var(--ok); }
+  .chip.bad { color: var(--bad); }
+  .chip.warn { color: var(--warn); }
+  .actions { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 8px; }
+  .btn {
+    font: 500 13px var(--font-ui); padding: 6px 11px; border: 1px solid var(--line); background: var(--panel);
+    color: var(--fg); border-radius: 7px; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .hint { position: absolute; left: 12px; bottom: 12px; color: var(--muted); font-size: 12px; }
+
+  @media (max-width: 820px) {
+    html, body { height: auto; }
+    .app { grid-template-columns: 1fr; height: auto; }
+    .stage-wrap { order: -1; height: 60vh; min-height: 320px; margin: 12px 16px 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    .panel { border-right: 0; padding-inline: 16px; background: transparent; overflow: visible; }
+    .hint { display: none; }
+  }
+</style>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+</script>
+</head>
+<body>
+<div class="app">
+  <aside class="panel">
+    <header>
+      <h1>DH Manipulator Lab</h1>
+      <p>Forward and inverse kinematics from Denavit–Hartenberg tables</p>
+    </header>
+
+    <section>
+      <h2><label for="manip">Manipulator</label></h2>
+      <select id="manip"></select>
+      <p class="desc" id="desc"></p>
+    </section>
+
+    <section>
+      <h2>Mode</h2>
+      <div class="seg" role="radiogroup" aria-label="Kinematics mode">
+        <input type="radio" name="mode" id="mode-fk" value="fk" checked>
+        <label for="mode-fk">Forward<small>q → p</small></label>
+        <input type="radio" name="mode" id="mode-ik" value="ik">
+        <label for="mode-ik">Inverse<small>p → q</small></label>
+      </div>
+    </section>
+
+    <section id="fk-panel">
+      <h2>Joint variables</h2>
+      <div id="joint-ctls" class="choices"></div>
+    </section>
+
+    <section id="ik-panel" hidden>
+      <h2>Target position</h2>
+      <div id="target-ctls" class="choices"></div>
+      <h2>Solver</h2>
+      <div id="solvers" class="choices"></div>
+      <div id="null-ctl" hidden></div>
+    </section>
+
+    <section>
+      <h2>Display</h2>
+      <div class="toggles">
+        <label class="choice"><input type="checkbox" id="show-frames" checked> DH frames</label>
+        <label class="choice"><input type="checkbox" id="show-labels" checked> Labels</label>
+        <label class="choice"><input type="checkbox" id="show-trail"> Effector trail</label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Joint values</h2>
+      <dl class="readout" id="q-out"></dl>
+    </section>
+
+    <section>
+      <h2>End-effector position</h2>
+      <dl class="readout" id="xyz-out"></dl>
+    </section>
+
+    <section>
+      <h2>End-effector pose T<sub>0</sub><sup>n</sup></h2>
+      <div class="scroll"><div class="matrix" id="t-out"></div></div>
+    </section>
+
+    <section>
+      <h2>Singularities</h2>
+      <p class="desc" id="sing-summary"></p>
+      <div id="sing-families" class="families"></div>
+      <div><button type="button" class="btn" id="sing-search">Find nearest singular pose</button></div>
+      <p class="msg" id="sing-msg" hidden></p>
+      <dl class="readout">
+        <dt>manipulability</dt><dd id="w-out"></dd>
+        <dt>σ<sub>min</sub>/σ<sub>max</sub> of J</dt><dd id="c-out"></dd>
+        <dt>lost direction</dt><dd id="lost-out"></dd>
+      </dl>
+    </section>
+
+    <section>
+      <h2>DH table</h2>
+      <div class="scroll">
+        <table class="dh">
+          <thead><tr><th>i</th><th>θ<sub>i</sub></th><th>d<sub>i</sub></th><th>a<sub>i</sub></th><th>α<sub>i</sub></th></tr></thead>
+          <tbody id="dh-out"></tbody>
+        </table>
+      </div>
+    </section>
+  </aside>
+
+  <main class="stage-wrap">
+    <div id="stage" aria-label="3-D view of the manipulator; drag to orbit, scroll to zoom"></div>
+    <div id="tags"></div>
+    <div class="hud">
+      <div class="p" id="p-out"></div>
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="hint">Drag to orbit · scroll to zoom · right-drag to pan</div>
+    <div class="actions">
+      <button type="button" class="btn" id="reset-pose">Reset pose</button>
+      <button type="button" class="btn" id="reset-view">Reset view</button>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// Generated by gen_app.py from manipulators/*.toml
+const MANIPULATORS = /*@@MANIPULATORS@@*/[];
+const DEFAULT_ID = /*@@DEFAULT@@*/null;
+
+const DEG = Math.PI / 180;
+const $ = (id) => document.getElementById(id);
+const SUB = '₀₁₂₃₄₅₆₇₈₉';
+const subscript = (s) => String(s).replace(/([A-Za-zα-ωπ])(\d+)/g, (_, c, d) => c + [...d].map((x) => SUB[+x]).join(''));
+const pretty = (s) => subscript(String(s).replace(/\*deg/g, '°').replace(/pi/g, 'π').replace(/\*\*2/g, '²').replace(/\*\*3/g, '³')
+  .replace(/\*\*/g, '^').replace(/\*/g, '·').replace(/-/g, '−'));
+
+// ---------------------------------------------------------------- vectors & matrices
+const sub = (a, b) => a.map((x, i) => x - b[i]);
+const add = (a, b) => a.map((x, i) => x + b[i]);
+const scale = (a, s) => a.map((x) => x * s);
+const dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
+const norm = (a) => Math.hypot(...a);
+const unit = (a) => { const n = norm(a); return n > 1e-12 ? a.map((x) => x / n) : a.slice(); };
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+
+const I4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+function mul4(A, B) {
+  const C = new Array(16);
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+    let s = 0;
+    for (let k = 0; k < 4; k++) s += A[4 * r + k] * B[4 * k + c];
+    C[4 * r + c] = s;
+  }
+  return C;
+}
+// A_i = Rot_z(theta) Trans_z(d) Trans_x(a) Rot_x(alpha)
+function dhA([th, d, a, al]) {
+  const ct = Math.cos(th), st = Math.sin(th), ca = Math.cos(al), sa = Math.sin(al);
+  return [ct, -st * ca, st * sa, a * ct, st, ct * ca, -ct * sa, a * st, 0, sa, ca, d, 0, 0, 0, 1];
+}
+const colOf = (T, k) => [T[k], T[4 + k], T[8 + k]];
+const posOf = (T) => [T[3], T[7], T[11]];
+
+const zeros = (m, n) => Array.from({ length: m }, () => new Array(n).fill(0));
+const transpose = (A) => A[0].map((_, j) => A.map((r) => r[j]));
+function matmul(A, B) {
+  const C = zeros(A.length, B[0].length);
+  for (let i = 0; i < A.length; i++) for (let j = 0; j < B[0].length; j++)
+    for (let k = 0; k < B.length; k++) C[i][j] += A[i][k] * B[k][j];
+  return C;
+}
+function inverse(A) {
+  const n = A.length;
+  const M = A.map((r, i) => [...r, ...Array.from({ length: n }, (_, j) => (i === j ? 1 : 0))]);
+  for (let c = 0; c < n; c++) {
+    let p = c;
+    for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    [M[c], M[p]] = [M[p], M[c]];
+    const piv = M[c][c];
+    if (Math.abs(piv) < 1e-14) return null;
+    for (let j = 0; j < 2 * n; j++) M[c][j] /= piv;
+    for (let r = 0; r < n; r++) if (r !== c) {
+      const f = M[r][c];
+      for (let j = 0; j < 2 * n; j++) M[r][j] -= f * M[c][j];
+    }
+  }
+  return M.map((r) => r.slice(n));
+}
+function det(A) {
+  const M = A.map((r) => r.slice());
+  const n = M.length;
+  let d = 1;
+  for (let c = 0; c < n; c++) {
+    let p = c;
+    for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    if (Math.abs(M[p][c]) < 1e-300) return 0;
+    if (p !== c) { [M[c], M[p]] = [M[p], M[c]]; d = -d; }
+    d *= M[c][c];
+    for (let r = c + 1; r < n; r++) {
+      const f = M[r][c] / M[c][c];
+      for (let j = c; j < n; j++) M[r][j] -= f * M[c][j];
+    }
+  }
+  return d;
+}
+
+// eigenvalues of a symmetric 1x1, 2x2 or 3x3 matrix (closed form)
+function eigSym(A) {
+  const n = A.length;
+  if (n === 1) return [A[0][0]];
+  if (n === 2) {
+    const tr = A[0][0] + A[1][1], dt = A[0][0] * A[1][1] - A[0][1] * A[1][0];
+    const s = Math.sqrt(Math.max(0, tr * tr / 4 - dt));
+    return [tr / 2 - s, tr / 2 + s];
+  }
+  const p1 = A[0][1] ** 2 + A[0][2] ** 2 + A[1][2] ** 2;
+  const q = (A[0][0] + A[1][1] + A[2][2]) / 3;
+  if (p1 < 1e-30) return [A[0][0], A[1][1], A[2][2]];
+  const p2 = (A[0][0] - q) ** 2 + (A[1][1] - q) ** 2 + (A[2][2] - q) ** 2 + 2 * p1;
+  const p = Math.sqrt(p2 / 6);
+  const B = A.map((r, i) => r.map((x, j) => (x - (i === j ? q : 0)) / p));
+  const r = Math.min(1, Math.max(-1, det(B) / 2));
+  const phi = Math.acos(r) / 3;
+  const e1 = q + 2 * p * Math.cos(phi), e3 = q + 2 * p * Math.cos(phi + 2 * Math.PI / 3);
+  return [e3, 3 * q - e1 - e3, e1];
+}
+
+// unit null vector of the symmetric matrix A - lam I (eigenvector for eigenvalue lam), sizes 1-3
+function eigvecSym(A, lam) {
+  const n = A.length;
+  if (n === 1) return [1];
+  const B = A.map((r, i) => r.map((x, j) => x - (i === j ? lam : 0)));
+  const cands = n === 2
+    ? [[B[0][1], -B[0][0]], [B[1][1], -B[1][0]]]
+    : [cross(B[0], B[1]), cross(B[0], B[2]), cross(B[1], B[2])];
+  const best = cands.reduce((a, b) => (norm(b) > norm(a) ? b : a));
+  return norm(best) > 1e-12 ? unit(best) : Array.from({ length: n }, (_, i) => (i === 0 ? 1 : 0));
+}
+
+// ---------------------------------------------------------------- kinematics
+function framesAt(M, q) {
+  const out = [I4];
+  let T = I4;
+  for (const row of M.dh(...q)) { T = mul4(T, dhA(row)); out.push(T); }
+  return out;
+}
+const endPos = (M, q) => posOf(framesAt(M, q).at(-1));
+const taskOf = (M, p) => M.task.map((k) => p[k]);
+
+function jacobian(M, q) {
+  const h = 1e-6;
+  const cols = q.map((_, j) => {
+    const qp = q.slice(), qm = q.slice();
+    qp[j] += h; qm[j] -= h;
+    return scale(sub(taskOf(M, endPos(M, qp)), taskOf(M, endPos(M, qm))), 1 / (2 * h));
+  });
+  return M.task.map((_, i) => cols.map((c) => c[i]));
+}
+// damped pseudo-inverse J^+ = J^T (J J^T + lambda^2 I)^-1
+function pinv(J, lam) {
+  const Jt = transpose(J);
+  const A = matmul(J, Jt);
+  for (let i = 0; i < A.length; i++) A[i][i] += lam * lam;
+  return matmul(Jt, inverse(A));
+}
+// Singularity measures over the joints that move the effector (idle joints have a zero column).
+// G is the Gram matrix J J^T (at least as many joints as coordinates) or J^T J (fewer).
+function gramOf(M, q) {
+  const idle = new Set(M.singular.idle);
+  const J = jacobian(M, q).map((r) => r.filter((_, j) => !idle.has(j)));
+  const wide = J[0].length >= J.length;
+  return { G: wide ? matmul(J, transpose(J)) : matmul(transpose(J), J), wide };
+}
+function singularityAt(M, q) {
+  const { G, wide } = gramOf(M, q);
+  const ev = eigSym(G).map((x) => Math.max(0, x));
+  const lmin = Math.min(...ev), lmax = Math.max(...ev);
+  const invCond = Math.sqrt(lmin / Math.max(lmax, 1e-300));
+  let lost = null;      // task direction the effector cannot move in (unique only when G = J J^T)
+  if (wide) {
+    const u = eigvecSym(G, lmin);
+    lost = [0, 0, 0];
+    M.task.forEach((k, i) => { lost[k] = u[i]; });
+  }
+  return { invCond, w: Math.sqrt(Math.max(0, det(G))), lost, near: invCond < 0.05 };
+}
+
+const limitQ = (M, q) => q.map((x, i) => {
+  const j = M.joints[i];
+  return j.type === 'revolute' ? wrap(x) : Math.min(j.max, Math.max(j.min, x));
+});
+
+// ---------------------------------------------------------------- state
+const state = {
+  M: null, q: [], mode: 'fk', target: [0, 0, 0], solver: 'numeric', goal: 0,
+  reachable: true, residual: 0, branchFail: false,
+  showFrames: true, showLabels: true, showTrail: false, trail: [],
+};
+
+// ---------------------------------------------------------------- inverse kinematics
+function residual() {
+  return norm(sub(taskOf(state.M, state.target), taskOf(state.M, endPos(state.M, state.q))));
+}
+function solveNumeric() {
+  const start = state.q.slice();
+  descend();
+  if (state.reachable) return;
+  // stuck (typically started at a singular pose): retry from a few other poses, keep the best
+  let best = { q: state.q, res: state.residual };
+  for (let k = 1; k <= 8; k++) {
+    state.q = start.map((v, i) => {
+      const j = state.M.joints[i];
+      const u = ((Math.sin(12.9898 * k + 78.233 * i) * 43758.5453) % 1 + 1) % 1;   // fixed pseudo-random in [0, 1)
+      return j.type === 'revolute' ? wrap(v + (u - 0.5) * 2 * Math.PI) : j.min + u * (j.max - j.min);
+    });
+    descend();
+    if (state.residual < best.res) best = { q: state.q, res: state.residual };
+    if (state.reachable) return;
+  }
+  state.q = best.q;
+  state.residual = best.res;
+  state.reachable = best.res < 1e-4 * state.M.reach;
+}
+function descend() {
+  const M = state.M;
+  const t = taskOf(M, state.target);
+  const lam = 0.01 * M.reach;
+  const redundant = state.q.length > M.task.length;
+  let q = state.q.slice();
+  for (let it = 0; it < 120; it++) {
+    const e = sub(t, taskOf(M, endPos(M, q)));
+    const J = jacobian(M, q);
+    const Jp = pinv(J, lam);
+    let dq = Jp.map((row) => dot(row, e));
+    if (redundant) {
+      // null-space term (I - J^+ J) z with z pulling q1 toward the goal: moves joints, not the effector
+      const P = zeros(q.length, q.length).map((r, i) => r.map((_, j) => (i === j ? 1 : 0) - dot(Jp[i], J.map((jr) => jr[j]))));
+      const z = q.map((_, i) => (i === 0 ? -0.4 * wrap(q[0] - state.goal) : 0));
+      dq = add(dq, P.map((r) => dot(r, z)));
+    }
+    q = limitQ(M, add(q, dq));
+    if (norm(e) < 1e-10 * M.reach && norm(dq) < 1e-9) break;
+  }
+  // the damped projector leaks a little into the task: finish with plain pseudo-inverse steps
+  for (let it = 0; it < 40; it++) {
+    const e = sub(t, taskOf(M, endPos(M, q)));
+    if (norm(e) < 1e-12 * M.reach) break;
+    const Jp = pinv(jacobian(M, q), 1e-3 * lam);
+    q = limitQ(M, add(q, Jp.map((row) => dot(row, e))));
+  }
+  state.q = q;
+  state.residual = residual();
+  state.reachable = state.residual < 1e-4 * M.reach;
+  state.branchFail = false;
+}
+function solveClosed(branch) {
+  const sol = branch.solve(...state.target);
+  if (sol.some((x) => !Number.isFinite(x))) {
+    state.reachable = false; state.branchFail = true; state.residual = NaN;
+    return;
+  }
+  state.q = limitQ(state.M, sol);
+  state.residual = residual();
+  state.reachable = state.residual < 1e-6 * state.M.reach;
+  state.branchFail = false;
+}
+function solveIK() {
+  if (state.solver === 'numeric') solveNumeric();
+  else solveClosed(state.M.ik[state.solver]);
+}
+
+// ---------------------------------------------------------------- scene
+const stageEl = $('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+stageEl.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, 1, 0.01, 1000);
+camera.up.set(0, 0, 1);
+const controls = new OrbitControls(camera, renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a96a3, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+scene.add(sun);
+
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const MAT = {
+  link: new THREE.MeshStandardMaterial({ color: 0xa7adb5, metalness: 0.35, roughness: 0.45 }),
+  revolute: new THREE.MeshStandardMaterial({ color: 0x2a78d6, metalness: 0.15, roughness: 0.4 }),
+  prismatic: new THREE.MeshStandardMaterial({ color: 0xeb6834, metalness: 0.15, roughness: 0.45 }),
+  dark: new THREE.MeshStandardMaterial({ color: 0x4a4a48, metalness: 0.3, roughness: 0.55 }),
+  target: new THREE.MeshStandardMaterial({ color: 0x2a78d6, emissive: 0x0b2a55, roughness: 0.3 }),
+};
+const AXIS_COLORS = [0xe34948, 0x1f9d3a, 0x2a78d6];
+const Y = new THREE.Vector3(0, 1, 0);
+const v3 = (a) => new THREE.Vector3(a[0], a[1], a[2]);
+
+let robot = null;     // per-manipulator objects
+let floor = null;
+
+function disposeTree(obj) {
+  obj.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+  scene.remove(obj);
+}
+
+function buildRobot(M) {
+  if (robot) disposeTree(robot.group);
+  const r = 0.018 * M.size;
+  const n = M.joints.length;
+  const group = new THREE.Group();
+  const cyl = (radius, mat) => new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 1, 32), mat);
+
+  const base = new THREE.Mesh(new THREE.BoxGeometry(10 * r, 10 * r, 1.2 * r), MAT.dark);
+  const links = Array.from({ length: 2 * n }, () => cyl(r, MAT.link));
+  const joints = M.joints.map((j) => j.type === 'revolute'
+    ? new THREE.Mesh(new THREE.CylinderGeometry(2 * r, 2 * r, 5.2 * r, 40), MAT.revolute)
+    : new THREE.Mesh(new THREE.BoxGeometry(4 * r, 8 * r, 4 * r), MAT.prismatic));
+
+  // gripper in its own frame: x = jaw direction, y = approach, z = side
+  const gripper = new THREE.Group();
+  gripper.matrixAutoUpdate = false;
+  const stem = cyl(0.8 * r, MAT.dark);
+  stem.scale.set(1, 1.5 * r, 1);
+  stem.position.set(0, 0.75 * r, 0);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(8 * r, 1.6 * r, 1.6 * r), MAT.dark);
+  bar.position.set(0, 1.5 * r, 0);
+  gripper.add(stem, bar);
+  for (const s of [-1, 1]) {
+    const prong = new THREE.Mesh(new THREE.BoxGeometry(1.2 * r, 6 * r, 1.6 * r), MAT.dark);
+    prong.position.set(s * 3.4 * r, 4.5 * r, 0);
+    gripper.add(prong);
+  }
+
+  const L = 0.11 * M.size;
+  const arrows = Array.from({ length: n + 1 }, () => [0, 1, 2].map((k) => {
+    const a = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), L, AXIS_COLORS[k], 0.28 * L, 0.14 * L);
+    return a;
+  }));
+  const frameGroup = new THREE.Group();
+  arrows.flat().forEach((a) => frameGroup.add(a));
+
+  const target = new THREE.Mesh(new THREE.SphereGeometry(1.6 * r, 24, 16), MAT.target);
+
+  const lineMat = (color, opts = {}) => new THREE.LineBasicMaterial({ color, ...opts });
+  const shadow = new THREE.Line(new THREE.BufferGeometry(), lineMat(0x9aa3ad, { transparent: true, opacity: 0.8 }));
+  const drop = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: 0x7d8792, dashSize: 0.03 * M.size, gapSize: 0.02 * M.size }));
+  const miss = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: 0xc23b36, dashSize: 0.02 * M.size, gapSize: 0.015 * M.size }));
+  const trailGeom = new THREE.BufferGeometry();
+  trailGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3 * 600), 3));
+  const trail = new THREE.Line(trailGeom, lineMat(0xeb6834));
+
+  // base axes X0 Y0 Z0
+  const axesGeom = new THREE.BufferGeometry();
+  const A = 0.5 * M.size;
+  axesGeom.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, A, 0, 0, 0, 0, 0, 0, A, 0, 0, 0, 0, 0, 0, A], 3));
+  const axes = new THREE.LineSegments(axesGeom, lineMat(0x7d8792));
+
+  // drawn over everything, so the gripper cannot hide them
+  const lostArrows = [1, -1].map(() => {
+    const a = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), 0.32 * M.size, 0xe0a03a, 0.08 * M.size, 0.045 * M.size);
+    [a.line, a.cone].forEach((o) => { o.material.depthTest = false; o.renderOrder = 10; });
+    return a;
+  });
+
+  group.add(base, ...links, ...joints, gripper, frameGroup, target, shadow, drop, miss, trail, axes, ...lostArrows);
+  scene.add(group);
+  robot = { group, r, links, joints, gripper, arrows, frameGroup, target, shadow, drop, miss, trail, axes, base, A, lostArrows };
+}
+
+function buildFloor(M, center) {
+  if (floor) disposeTree(floor);
+  const size = Math.ceil(2.6 * M.size * 10) / 10;
+  floor = new THREE.GridHelper(size, 12, new THREE.Color(css('--grid-major')), new THREE.Color(css('--grid-minor')));
+  floor.rotation.x = Math.PI / 2;
+  floor.position.set(center[0], center[1], M.z0 - 1e-3 * M.reach);
+  scene.add(floor);
+}
+
+function placeSegment(mesh, a, b) {
+  const d = sub(b, a);
+  const len = norm(d);
+  mesh.visible = len > 1e-9;
+  if (!mesh.visible) return;
+  mesh.position.set(...scale(add(a, b), 0.5));
+  mesh.quaternion.setFromUnitVectors(Y, v3(scale(d, 1 / len)));
+  mesh.scale.set(1, len, 1);
+}
+function setLine(line, pts) {
+  line.geometry.setAttribute('position', new THREE.Float32BufferAttribute(pts.flat(), 3));
+  line.geometry.computeBoundingSphere();
+  if (line.material.isLineDashedMaterial) line.computeLineDistances();
+}
+
+// geometry of the chain: o_{i-1} -> m_i (along z_{i-1}, the d offset) -> o_i (along x_i, the a length)
+function chainOf(F) {
+  const o = F.map(posOf);
+  const m = [];
+  for (let i = 1; i < F.length; i++) {
+    const x = colOf(F[i], 0);
+    m.push(sub(o[i], scale(x, dot(sub(o[i], o[i - 1]), x))));
+  }
+  const pts = [o[0]];
+  for (let i = 1; i < F.length; i++) pts.push(m[i - 1], o[i]);
+  return { o, m, pts };
+}
+
+let jointCentres = [];
+function updateScene() {
+  const M = state.M, R = robot, r = R.r;
+  const F = framesAt(M, state.q);
+  const { o, m, pts } = chainOf(F);
+  const n = M.joints.length;
+
+  R.base.position.set(o[0][0], o[0][1], M.z0 - 0.6 * r);
+  for (let k = 0; k < R.links.length; k++) placeSegment(R.links[k], pts[k], pts[k + 1]);
+
+  jointCentres = [];
+  for (let i = 1; i <= n; i++) {
+    const axis = unit(colOf(F[i - 1], 2));
+    const dvec = sub(m[i - 1], o[i - 1]);
+    const sgn = Math.sign(dot(dvec, axis)) || 1;
+    let c = o[i - 1];
+    if (M.joints[i - 1].type === 'revolute') { if (i === 1) c = add(o[0], scale(axis, 3 * r * sgn)); }
+    else c = add(o[i - 1], scale(axis, 4 * r * sgn));
+    const mesh = R.joints[i - 1];
+    mesh.position.set(...c);
+    mesh.quaternion.setFromUnitVectors(Y, v3(axis));
+    jointCentres.push(c);
+  }
+
+  // gripper: approach along the last non-zero segment, jaws across it from the last frame
+  let k = pts.length - 2;
+  while (k > 0 && norm(sub(pts[pts.length - 1], pts[k])) < 1e-9) k--;
+  const approach = unit(sub(pts[pts.length - 1], pts[k]));
+  const Fn = F[n];
+  let jaw = [1, 0, 2].map((c) => colOf(Fn, c)).find((v) => Math.abs(dot(v, approach)) < 0.5) || colOf(Fn, 1);
+  jaw = unit(sub(jaw, scale(approach, dot(jaw, approach))));
+  const side = cross(jaw, approach);
+  const G = new THREE.Matrix4().makeBasis(v3(jaw), v3(approach), v3(side));
+  G.setPosition(...o[n]);
+  R.gripper.matrix.copy(G);
+
+  // frames
+  R.frameGroup.visible = state.showFrames;
+  F.forEach((T, i) => R.arrows[i].forEach((a, c) => { a.position.set(...posOf(T)); a.setDirection(v3(colOf(T, c))); }));
+
+  // depth cues: shadow trace on the floor and drop lines from the elbow and the effector
+  setLine(R.shadow, pts.map((p) => [p[0], p[1], M.z0]));
+  const drops = [m[n - 1], o[n]].flatMap((p) => [p, [p[0], p[1], M.z0]]);
+  setLine(R.drop, drops);
+  R.axes.position.set(...o[0]);
+
+  // target
+  const ik = state.mode === 'ik';
+  R.target.visible = ik;
+  R.target.position.set(...state.target);
+  MAT.target.color.set(state.reachable ? 0x2a78d6 : 0xc23b36);
+  MAT.target.emissive.set(state.reachable ? 0x0b2a55 : 0x4a0d0b);
+  R.miss.visible = ik && !state.reachable;
+  if (R.miss.visible) setLine(R.miss, [o[n], state.target]);
+
+  // trail
+  R.trail.visible = state.showTrail;
+  if (state.showTrail) {
+    const last = state.trail.at(-1);
+    if (!last || norm(sub(last, o[n])) > 1e-4 * M.size) state.trail.push(o[n]);
+    if (state.trail.length > 600) state.trail.shift();
+    const arr = R.trail.geometry.attributes.position.array;
+    state.trail.forEach((p, i) => arr.set(p, 3 * i));
+    R.trail.geometry.attributes.position.needsUpdate = true;
+    R.trail.geometry.setDrawRange(0, state.trail.length);
+    R.trail.geometry.computeBoundingSphere();
+  }
+
+  // singularity: arrows along the direction the effector cannot move in
+  state.sing = singularityAt(M, state.q);
+  R.lostArrows.forEach((a, i) => {
+    a.visible = state.sing.near && !!state.sing.lost;
+    if (a.visible) { a.position.set(...o[n]); a.setDirection(v3(scale(state.sing.lost, i === 0 ? 1 : -1))); }
+  });
+
+  updateReadouts(F);
+  requestRender();
+}
+
+// ---------------------------------------------------------------- labels over the canvas
+const tagsEl = $('tags');
+let tags = [];
+function buildTags(M) {
+  tagsEl.replaceChildren();
+  tags = [];
+  const mk = (text, cls, get) => {
+    const el = document.createElement('div');
+    el.className = 'tag ' + cls;
+    el.textContent = text;
+    tagsEl.appendChild(el);
+    tags.push({ el, get, cls });
+  };
+  // the base frame is the identity, so the axes start at the origin
+  ['X₀', 'Y₀', 'Z₀'].forEach((t, k) => mk(t, 'axis', () => { const e = [0, 0, 0]; e[k] = robot.A * 1.04; return e; }));
+  M.joints.forEach((j, i) => mk(subscript(j.name), 'joint', () => jointCentres[i]));
+}
+function placeTags() {
+  const w = renderer.domElement.clientWidth, h = renderer.domElement.clientHeight;
+  for (const t of tags) {
+    const p = t.get();
+    const show = state.showLabels && p;
+    if (!show) { t.el.hidden = true; continue; }
+    const v = v3(p).project(camera);
+    t.el.hidden = v.z > 1;
+    t.el.style.left = `${((v.x + 1) / 2) * w}px`;
+    t.el.style.top = `${((1 - v.y) / 2) * h}px`;
+  }
+}
+
+// ---------------------------------------------------------------- rendering & camera
+let pending = false;
+function requestRender() {
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => {
+    pending = false;
+    renderer.render(scene, camera);
+    placeTags();
+  });
+}
+controls.addEventListener('change', requestRender);
+
+function resize() {
+  const w = stageEl.clientWidth, h = stageEl.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  requestRender();
+}
+new ResizeObserver(resize).observe(stageEl);
+
+function resetView() {
+  const M = state.M;
+  const { pts } = chainOf(framesAt(M, M.pose));
+  const lo = [0, 1, 2].map((k) => Math.min(...pts.map((p) => p[k]), k === 2 ? M.z0 : 0));
+  const hi = [0, 1, 2].map((k) => Math.max(...pts.map((p) => p[k]), k === 2 ? M.z0 : 0));
+  const centre = scale(add(lo, hi), 0.5);
+  const elev = 22 * DEG, azim = 25 * DEG;
+  const dir = [Math.cos(elev) * Math.cos(azim), Math.cos(elev) * Math.sin(azim), Math.sin(elev)];
+  // frame the arm as posed (reach includes fully extended prismatic joints, which is too far out)
+  const dist = 2.9 * Math.max(norm(sub(hi, lo)), 0.5 * M.size);
+  camera.position.set(...add(centre, scale(dir, dist)));
+  controls.target.set(...centre);
+  camera.near = 0.01 * M.size; camera.far = 50 * M.reach;
+  camera.updateProjectionMatrix();
+  sun.position.set(...add(centre, [2 * M.size, -1.2 * M.size, 4 * M.size]));
+  controls.update();
+  buildFloor(M, [centre[0], centre[1]]);
+  requestRender();
+}
+
+function applyTheme() {
+  scene.background = new THREE.Color(css('--stage'));
+  if (state.M) {
+    const c = floor ? [floor.position.x, floor.position.y] : [0, 0];
+    buildFloor(state.M, c);
+  }
+  requestRender();
+}
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+// ---------------------------------------------------------------- readouts
+const fmtJoint = (j, v) => (j.type === 'revolute' ? `${(v / DEG).toFixed(1)}°` : v.toFixed(3));
+const fmt = (v) => (Math.abs(v) < 5e-4 ? '0.000' : v.toFixed(3));
+
+function updateReadouts(F) {
+  const M = state.M;
+  const T = F.at(-1);
+  const p = posOf(T);
+  $('p-out').textContent = `p = (${p.map(fmt).join(', ')})`;
+  $('q-out').replaceChildren(...M.joints.flatMap((j, i) => {
+    const dt = document.createElement('dt'); dt.textContent = subscript(j.name);
+    const dd = document.createElement('dd'); dd.textContent = fmtJoint(j, state.q[i]);
+    return [dt, dd];
+  }));
+  const rows = [['x', fmt(p[0])], ['y', fmt(p[1])], ['z', fmt(p[2])]];
+  if (state.mode === 'ik') rows.push(['distance to target', Number.isFinite(state.residual) ? state.residual.toExponential(2) : 'no solution']);
+  $('xyz-out').replaceChildren(...rows.flatMap(([k, v]) => {
+    const dt = document.createElement('dt'); dt.textContent = k;
+    const dd = document.createElement('dd'); dd.textContent = v;
+    return [dt, dd];
+  }));
+  $('t-out').replaceChildren(...T.map((v) => { const s = document.createElement('span'); s.textContent = fmt(v); return s; }));
+
+  const sg = state.sing;
+  $('w-out').textContent = sg.w.toExponential(2);
+  $('c-out').textContent = sg.invCond.toFixed(3);
+  $('lost-out').textContent = !sg.near ? 'none (regular pose)'
+    : sg.lost ? `(${sg.lost.map((x) => fmt(Math.abs(x) < 5e-4 ? 0 : x)).join(', ')})` : 'not unique';
+
+  const chips = [];
+  if (state.mode === 'fk') chips.push(['neutral', 'Forward kinematics']);
+  else if (state.reachable) chips.push(['ok', `On target · |e| = ${state.residual.toExponential(1)}`]);
+  else if (state.branchFail) chips.push(['bad', 'No real solution on this branch · pose kept']);
+  else chips.push(['bad', `Out of reach · closest pose, |e| = ${state.residual.toFixed(3)}`]);
+  if (sg.near) chips.push(['warn', sg.invCond < 1e-6 ? 'Singular configuration' : 'Near a singularity']);
+  $('chips').replaceChildren(...chips.map(([c, t]) => { const s = document.createElement('span'); s.className = `chip ${c}`; s.textContent = t; return s; }));
+}
+
+// ---------------------------------------------------------------- controls
+// A slider and a number field for the same value: either one drives the other.
+// Typed values are clamped to the slider's range; invalid text reverts when the field loses focus.
+function sliderRow({ id, sym, kind, extra, min, max, step, value, digits, unit, onInput }) {
+  const row = document.createElement('div');
+  row.className = 'ctl';
+  const label = document.createElement('label');
+  label.htmlFor = id;
+  const s = document.createElement('span'); s.className = 'sym'; s.textContent = sym;
+  label.append(s);
+  if (extra) label.append(document.createTextNode(extra));
+  if (kind) { const k = document.createElement('span'); k.className = 'kind'; k.textContent = kind; label.append(k); }
+
+  const range = document.createElement('input');
+  Object.assign(range, { type: 'range', id, min, max, step, value });
+  const num = document.createElement('input');
+  Object.assign(num, { type: 'text', id: `${id}-num`, value: (+value).toFixed(digits), autocomplete: 'off', spellcheck: false });
+  num.inputMode = 'decimal';
+  num.setAttribute('aria-label', `${sym}${extra || ''} value${unit ? ` in ${unit === '°' ? 'degrees' : unit}` : ''}`);
+  const field = document.createElement('span');
+  field.className = 'field';
+  const u = document.createElement('span'); u.className = 'unit'; u.textContent = unit || '';
+  field.append(num, u);
+
+  const clamp = (v) => Math.min(+max, Math.max(+min, v));
+  let current = +value;
+  const set = (v) => { current = v; range.value = v; if (document.activeElement !== num) num.value = v.toFixed(digits); };
+
+  range.addEventListener('input', () => { current = +range.value; num.value = current.toFixed(digits); onInput(current); });
+  num.addEventListener('input', () => {
+    const v = parseFloat(num.value.replace(',', '.').replace('−', '-'));
+    if (!Number.isFinite(v)) return;
+    current = clamp(v);
+    range.value = current;
+    onInput(current);
+  });
+  num.addEventListener('change', () => { num.value = current.toFixed(digits); });
+  num.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { num.blur(); return; }
+    if (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown') return;
+    ev.preventDefault();
+    const k = (ev.key === 'ArrowUp' ? 1 : -1) * (ev.shiftKey ? 10 : 1);
+    current = clamp(current + k * +step);
+    range.value = current;
+    num.value = current.toFixed(digits);
+    onInput(current);
+  });
+
+  row.append(label, field, range);
+  return { row, set };
+}
+
+let jointInputs = [], targetInputs = [];
+function buildJointControls() {
+  const M = state.M;
+  jointInputs = M.joints.map((j, i) => {
+    const rev = j.type === 'revolute';
+    const r = sliderRow({
+      id: `q-${i}`, sym: subscript(j.name), kind: j.type,
+      min: rev ? -180 : j.min, max: rev ? 180 : j.max, step: rev ? 0.5 : (j.max - j.min) / 400,
+      value: rev ? state.q[i] / DEG : state.q[i], digits: rev ? 1 : 3, unit: rev ? '°' : '',
+      onInput: (v) => { state.q[i] = rev ? v * DEG : v; updateScene(); },
+    });
+    return r;
+  });
+  $('joint-ctls').replaceChildren(...jointInputs.map((r) => r.row));
+}
+function syncJointControls() {
+  state.M.joints.forEach((j, i) => {
+    jointInputs[i].set(j.type === 'revolute' ? state.q[i] / DEG : state.q[i]);
+  });
+}
+
+function buildTargetControls() {
+  const M = state.M;
+  const names = ['x', 'y', 'z'];
+  const rows = [];
+  targetInputs = [];
+  for (let k = 0; k < 3; k++) {
+    if (!M.task.includes(k)) {
+      const p = document.createElement('p');
+      p.className = 'fixed';
+      p.textContent = `${names[k]} fixed at ${fmt(state.target[k])} (no joint moves it)`;
+      rows.push(p);
+      continue;
+    }
+    const lo = k === 2 ? M.z0 - 1.05 * M.reach : -1.05 * M.reach;
+    const hi = k === 2 ? M.z0 + 1.05 * M.reach : 1.05 * M.reach;
+    const r = sliderRow({
+      id: `t-${k}`, sym: names[k], kind: '', min: lo, max: hi, step: M.reach / 800, value: state.target[k],
+      digits: 3, unit: '',
+      onInput: (v) => { state.target[k] = v; solveIK(); syncJointControls(); updateScene(); },
+    });
+    targetInputs[k] = r;
+    rows.push(r.row);
+  }
+  $('target-ctls').replaceChildren(...rows);
+}
+function syncTargetControls() {
+  targetInputs.forEach((r, k) => { if (r) r.set(state.target[k]); });
+}
+
+function buildSolverChoices() {
+  const M = state.M;
+  const opts = M.ik.map((b, i) => [String(i), b.name, 'closed form']);
+  opts.push(['numeric', 'Numeric (damped pseudo-inverse)', M.ik.length ? '' : 'no closed form in the spec']);
+  if (!opts.some(([v]) => v === state.solver)) state.solver = M.ik.length ? '0' : 'numeric';
+  $('solvers').replaceChildren(...opts.map(([value, text, note]) => {
+    const l = document.createElement('label');
+    l.className = 'choice';
+    const inp = document.createElement('input');
+    Object.assign(inp, { type: 'radio', name: 'solver', value, id: `solver-${value}`, checked: value === state.solver });
+    inp.addEventListener('change', () => { state.solver = value; updateNullCtl(); solveIK(); syncJointControls(); updateScene(); });
+    l.append(inp, document.createTextNode(text));
+    if (note) { const s = document.createElement('span'); s.className = 'note'; s.textContent = note; l.append(s); }
+    return l;
+  }));
+  updateNullCtl();
+}
+function updateNullCtl() {
+  const M = state.M;
+  const show = state.solver === 'numeric' && M.joints.length > M.task.length;
+  $('null-ctl').hidden = !show;
+  if (show) {
+    state.goal = state.q[0];
+    const r = sliderRow({
+      id: 'goal', sym: subscript(M.joints[0].name), extra: ' goal', kind: 'null-space motion',
+      min: -180, max: 180, step: 0.5, value: state.goal / DEG, digits: 1, unit: '°',
+      onInput: (v) => { state.goal = v * DEG; solveIK(); syncJointControls(); updateScene(); },
+    });
+    $('null-ctl').replaceChildren(r.row);
+  }
+}
+
+// ---------------------------------------------------------------- singularities
+function jumpTo(q) {
+  state.q = limitQ(state.M, q);
+  if (state.mode === 'ik') {
+    state.target = endPos(state.M, state.q);
+    state.reachable = true; state.residual = 0; state.branchFail = false;
+    syncTargetControls();
+    updateNullCtl();
+  }
+  syncJointControls();
+  updateScene();
+}
+function singMessage(text) {
+  $('sing-msg').hidden = !text;
+  $('sing-msg').textContent = text || '';
+}
+// Newton on the family's factor, moving the joint it depends on most strongly at the current pose
+function solveFamily(fam) {
+  const f = (q) => fam.f(...q);
+  const d = (q, j) => { const a = q.slice(), b = q.slice(); a[j] += 1e-6; b[j] -= 1e-6; return (f(a) - f(b)) / 2e-6; };
+  let q = state.q.slice();
+  const j = fam.joints.reduce((best, jj) => (Math.abs(d(q, jj)) > Math.abs(d(q, best)) ? jj : best), fam.joints[0]);
+  for (let it = 0; it < 60; it++) {
+    const v = f(q), g = d(q, j);
+    if (Math.abs(v) < 1e-13 || Math.abs(g) < 1e-14) break;
+    q[j] -= v / g;
+  }
+  if (Math.abs(f(q)) < 1e-9) { singMessage(''); jumpTo(q); }
+  else singMessage(`No solution for ${subscript(state.M.joints[j].name)} from this pose. Move the other joints and try again.`);
+}
+// gradient descent on sqrt(det G), the product of the singular values, from the current pose
+function nearestSingular() {
+  const M = state.M;
+  const vol = (q) => Math.sqrt(Math.max(0, det(gramOf(M, q).G)));
+  let q = state.q.slice(), t = 0.3;
+  for (let it = 0; it < 400; it++) {
+    const f0 = vol(q);
+    if (singularityAt(M, q).invCond < 1e-7) break;
+    const g = q.map((_, j) => { const a = q.slice(), b = q.slice(); a[j] += 1e-6; b[j] -= 1e-6; return (vol(a) - vol(b)) / 2e-6; });
+    const gn = norm(g);
+    if (gn < 1e-14) break;
+    let moved = false;
+    while (t > 1e-12) {
+      const qn = limitQ(M, add(q, scale(g, -t / gn)));
+      if (vol(qn) < f0) { q = qn; t = Math.min(2 * t, 0.5); moved = true; break; }
+      t /= 2;
+    }
+    if (!moved) break;
+  }
+  singMessage(singularityAt(M, q).invCond < 1e-4 ? '' : 'The search stopped before reaching a singularity (a joint limit may be in the way).');
+  jumpTo(q);
+}
+$('sing-search').addEventListener('click', nearestSingular);
+
+function buildSingularUI(M) {
+  const sg = M.singular;
+  const name = (j) => subscript(M.joints[j].name);
+  let summary = '';
+  if (sg.idle.length) {
+    const names = sg.idle.map(name).join(', ');
+    summary += `${names} never ${sg.idle.length > 1 ? 'move' : 'moves'} the end effector (zero column of J), so the analysis leaves ${sg.idle.length > 1 ? 'them' : 'it'} out. `;
+  }
+  if (sg.kind === 'square') summary += `det J = ${pretty(sg.detText)}. Each factor that depends on the joints is a family of singular poses.`;
+  else {
+    const na = M.joints.length - sg.idle.length;
+    summary += `J has ${M.task.length} rows and ${na} moving joints, so it is singular only when all ${sg.nMinors} of its ${sg.k}×${sg.k} minors vanish.`;
+    summary += sg.families.length ? ' They share the factor below.' : ' They share no factor; use the search to find a singular pose.';
+  }
+  $('sing-summary').textContent = summary;
+  singMessage('');
+  $('sing-families').replaceChildren(...sg.families.map((fam) => {
+    const box = document.createElement('div');
+    box.className = 'family';
+    const cond = document.createElement('div');
+    cond.className = 'cond';
+    cond.textContent = pretty(fam.text);
+    const btns = document.createElement('div');
+    btns.className = 'btns';
+    const button = (html, onClick) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'btn small';
+      b.append(...html);
+      b.addEventListener('click', onClick);
+      btns.append(b);
+    };
+    const sym = (t) => { const s = document.createElement('span'); s.className = 'sym'; s.textContent = t; return s; };
+    if (fam.values.length) {
+      fam.values.forEach(({ joint, value }) => {
+        const j = M.joints[joint];
+        const shown = j.type === 'revolute' ? `${(value / DEG).toFixed(1).replace('-', '−')}°` : value.toFixed(3);
+        button([sym(name(joint)), document.createTextNode(` = ${shown}`)], () => {
+          const q = state.q.slice(); q[joint] = value; singMessage(''); jumpTo(q);
+        });
+      });
+    } else {
+      button([document.createTextNode('Solve from the current pose')], () => solveFamily(fam));
+    }
+    box.append(cond, btns);
+    return box;
+  }));
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  $('fk-panel').hidden = mode !== 'fk';
+  $('ik-panel').hidden = mode !== 'ik';
+  if (mode === 'ik') {
+    state.target = endPos(state.M, state.q);
+    state.reachable = true; state.residual = 0; state.branchFail = false;
+    buildTargetControls();
+    buildSolverChoices();
+  } else {
+    syncJointControls();
+  }
+  updateScene();
+}
+document.querySelectorAll('input[name="mode"]').forEach((el) => el.addEventListener('change', () => setMode(el.value)));
+
+function loadManipulator(id) {
+  const M = MANIPULATORS.find((x) => x.id === id) || MANIPULATORS[0];
+  state.M = M;
+  state.q = M.pose.slice();
+  state.trail = [];
+  state.solver = M.ik.length ? '0' : 'numeric';
+  $('desc').textContent = M.description;
+  $('dh-out').replaceChildren(...M.dhText.map((row, i) => {
+    const tr = document.createElement('tr');
+    [String(i + 1), ...row.map(pretty)].forEach((c) => { const td = document.createElement('td'); td.textContent = c; tr.append(td); });
+    return tr;
+  }));
+  buildRobot(M);
+  buildTags(M);
+  buildSingularUI(M);
+  buildJointControls();
+  resetView();
+  setMode(state.mode);
+}
+
+$('manip').replaceChildren(...MANIPULATORS.map((M) => { const o = document.createElement('option'); o.value = M.id; o.textContent = M.name; return o; }));
+$('manip').addEventListener('change', (ev) => loadManipulator(ev.target.value));
+$('reset-view').addEventListener('click', resetView);
+$('reset-pose').addEventListener('click', () => {
+  state.q = state.M.pose.slice();
+  state.trail = [];
+  if (state.mode === 'ik') setMode('ik'); else { syncJointControls(); updateScene(); }
+});
+$('show-frames').addEventListener('change', (ev) => { state.showFrames = ev.target.checked; updateScene(); });
+$('show-labels').addEventListener('change', (ev) => { state.showLabels = ev.target.checked; requestRender(); });
+$('show-trail').addEventListener('change', (ev) => { state.showTrail = ev.target.checked; state.trail = []; updateScene(); });
+
+applyTheme();
+const startId = MANIPULATORS.some((M) => M.id === DEFAULT_ID) ? DEFAULT_ID : MANIPULATORS[0].id;
+$('manip').value = startId;
+loadManipulator(startId);
+resize();
+</script>
+</body>
+</html>

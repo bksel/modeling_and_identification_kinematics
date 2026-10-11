@@ -33,6 +33,10 @@ watch name: (generate name)
     @mkdir -p out
     typst watch --input "data=build/{{name}}/walkthrough.json" walkthrough.typ "out/{{name}}.pdf"
 
+# interactive 3-D app with every manipulator: out/app.html (open it in a browser)
+app:
+    "{{python}}" gen_app.py -o out/app.html
+
 # build every manipulator spec
 all:
     for f in manipulators/[!_]*.toml; do just walkthrough "$(basename "$f" .toml)"; done

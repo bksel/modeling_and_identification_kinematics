@@ -3,12 +3,15 @@
 Generates an A4 PDF walkthrough of a manipulator's kinematics from its
 Denavit–Hartenberg table. Each document contains:
 
-1. A kinematic schematic drawn automatically from the DH table (and your own figure next to it, if given)
+1. A kinematic schematic in the exercise-sheet notation and a shaded 3-D view, both drawn automatically
+   from the DH table (plus your own figure, if given)
 2. The DH table and the general DH transformation matrix
 3. Forward kinematics step by step: every `A_i` and the cumulative `T_0^i`, simplified with
    the usual `c_12 = cos(q1 + q2)` shorthand
 4. The end-effector position `p(q)` and a plot of the frames at a sample configuration
-5. The position Jacobian `J(q) = ∂p/∂q`
+5. The position Jacobian `J(q) = ∂p/∂q`, and its singular configurations: the factored `det J` (or the
+   minors, when `J` is not square), each family solved for its joints, and for example poses the direction the
+   end effector cannot move in and the joint motion that leaves it in place
 6. Inverse kinematics:
    - your closed-form solution (optional), typeset and checked against forward kinematics on 500 random targets
    - a numeric solution by damped least squares, with an iteration table and a plot
@@ -34,9 +37,10 @@ Run all commands from the repository root.
 just                      # list recipes and the available manipulators
 just walkthrough planar2  # manipulators/planar2.toml -> out/planar2.pdf
 just all                  # build every spec in manipulators/
-just schematic trr        # draw only the schematic (fast) -> build/trr/schematic.svg
+just schematic trr        # draw only the schematic and 3-D view (fast) -> build/trr/
 just watch trr            # re-render the PDF whenever walkthrough.typ changes
 just new mymanip          # start a new spec from the commented template
+just app                  # interactive 3-D app with every manipulator -> out/app.html
 just clean                # remove build/ and out/
 ```
 
@@ -51,6 +55,25 @@ A useful loop while writing a new DH table:
 1. Edit the spec.
 2. Run `just schematic <name>` and compare the drawing with your sketch.
 3. When it matches, run `just walkthrough <name>`.
+
+## Interactive app
+
+`just app` bundles every spec into one HTML page, `out/app.html`. Open it in a browser; it needs
+internet access to load three.js and the fonts. The page has:
+
+- a manipulator picker and an exclusive **Forward / Inverse** switch
+- **Forward:** a slider per joint
+- **Inverse:** sliders for the target position. Choose a closed-form branch from the spec, or the
+  numeric damped pseudo-inverse. For redundant arms, a *q₁ goal* slider moves the joints through
+  the null space while the end effector stays on the target.
+- toggles for the DH frames, labels and an end-effector trail
+- live joint values, end-effector position, `T_0^n` and the DH table
+- **Singularities:** the factored `det J` with a button for each singular value (e.g. `q₃ = 90°`), a solver
+  for families that couple several joints, and a search for the nearest singular pose. Near a singularity an
+  amber double arrow at the end effector shows the direction it cannot move in.
+
+The DH rows and closed-form solutions are converted to JavaScript by sympy (`gen_app.py`), so the
+page evaluates exactly the kinematics in the specs.
 
 ## Writing a manipulator spec
 
@@ -108,7 +131,7 @@ Z₀ up. Pick a pose where the arm is not foreshortened. Joint symbols:
 | Symbol | Meaning |
 |---|---|
 | crossed box | translational (prismatic) joint |
-| `]\|[` bearing | revolute joint, axis in the drawing plane |
+| `]\|[` bearing | revolute joint, axis in the drawing plane (a skewed square with a dot marks a right angle to the incoming link) |
 | ellipse with dashed axis | revolute joint, axis pointing toward X₀ (oblique view) |
 | circle with angle arc | revolute joint, axis toward the viewer (top view) |
 
@@ -160,6 +183,9 @@ Justfile             build recipes
 kinematics_lib.py    SO(3)/SE(3) helpers and DH transforms (sympy)
 gen_walkthrough.py   spec -> JSON + figures (symbolic FK, Jacobian, IK, plots)
 schematic.py         kinematic schematic drawn from the DH frames
+render3d.py          shaded 3-D view (matplotlib) of the same pose
+gen_app.py           specs -> interactive app (out/app.html), using app_template.html
+singularities.py     singular configurations of J (shared by the PDF and the app)
 walkthrough.typ      Typst layout of the A4 document
 manipulators/        specs; _template.toml documents every option
 build/, out/         generated (ignored by git)
