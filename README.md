@@ -41,6 +41,7 @@ just schematic trr        # draw only the schematic and 3-D view (fast) -> build
 just watch trr            # re-render the PDF whenever walkthrough.typ changes
 just new mymanip          # start a new spec from the commented template
 just app                  # interactive 3-D app with every manipulator -> out/app.html
+just groups               # group axioms for SO(3) and SE(3) -> out/groups.pdf
 just clean                # remove build/ and out/
 ```
 
@@ -74,6 +75,16 @@ internet access to load three.js and the fonts. The page has:
 
 The DH rows and closed-form solutions are converted to JavaScript by sympy (`gen_app.py`), so the
 page evaluates exactly the kinematics in the specs.
+
+## Groups, SO(3) and SE(3)
+
+`just groups` builds `out/groups.pdf`, a separate document on how a group is defined (objects,
+operation, identity element, inverse element) and how SO(3) and SE(3) satisfy that definition.
+`gen_groups.py` checks every axiom symbolically on generally parameterised rotations and
+transformations; the document prints a red warning only if a check fails. The last section shows
+that the forward kinematics of one manipulator is an element of SE(3) and gives its inverse,
+first symbolically and then with numbers at the spec's `[sample]` configuration.
+`just groups planar2` uses another spec for that example (default: `elbow3r`).
 
 ## Writing a manipulator spec
 
@@ -187,6 +198,8 @@ render3d.py          shaded 3-D view (matplotlib) of the same pose
 gen_app.py           specs -> interactive app (out/app.html), using app_template.html
 singularities.py     singular configurations of J (shared by the PDF and the app)
 walkthrough.typ      Typst layout of the A4 document
+gen_groups.py        group axioms for SO(3) and SE(3), checked symbolically -> JSON + figure
+groups.typ           Typst layout of the groups document
 manipulators/        specs; _template.toml documents every option
 build/, out/         generated (ignored by git)
 ```

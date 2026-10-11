@@ -11,3 +11,5 @@ out/
 *.ipynb
 .ipynb_checkpoints/
 *.pdf
+
+.vscode

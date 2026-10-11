@@ -37,6 +37,13 @@ watch name: (generate name)
 app:
     "{{python}}" gen_app.py -o out/app.html
 
+# group axioms for SO(3) and SE(3), checked with sympy: out/groups.pdf (name: the SE(3) example)
+groups name="elbow3r":
+    "{{python}}" gen_groups.py "manipulators/{{name}}.toml" -o build/groups
+    @mkdir -p out
+    typst compile --input "data=build/groups/groups.json" groups.typ out/groups.pdf
+    @echo '-> out/groups.pdf'
+
 # build every manipulator spec
 all:
     for f in manipulators/[!_]*.toml; do just walkthrough "$(basename "$f" .toml)"; done
