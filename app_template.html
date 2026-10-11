@@ -416,16 +416,22 @@ function gramOf(M, q) {
   const idle = new Set(M.singular.idle);
   const J = jacobian(M, q).map((r) => r.filter((_, j) => !idle.has(j)));
   const wide = J[0].length >= J.length;
-  return { G: wide ? matmul(J, transpose(J)) : matmul(transpose(J), J), wide };
+  const gram = (A) => (wide ? matmul(A, transpose(A)) : matmul(transpose(A), A));
+  // Joints have different units (rad vs length), which skews sigma_min/sigma_max for no geometric reason.
+  // Scaling the columns to unit length keeps the singular poses (a rank property) and makes the ratio comparable.
+  const cn = J[0].map((_, j) => norm(J.map((r) => r[j])));
+  const floor = 1e-3 * Math.max(...cn, 1e-300);
+  const Js = J.map((r) => r.map((x, j) => x / Math.max(cn[j], floor)));
+  return { G: gram(J), Gs: gram(Js), wide };
 }
 function singularityAt(M, q) {
-  const { G, wide } = gramOf(M, q);
-  const ev = eigSym(G).map((x) => Math.max(0, x));
+  const { G, Gs, wide } = gramOf(M, q);
+  const ev = eigSym(Gs).map((x) => Math.max(0, x));
   const lmin = Math.min(...ev), lmax = Math.max(...ev);
   const invCond = Math.sqrt(lmin / Math.max(lmax, 1e-300));
   let lost = null;      // task direction the effector cannot move in (unique only when G = J J^T)
   if (wide) {
-    const u = eigvecSym(G, lmin);
+    const u = eigvecSym(Gs, lmin);
     lost = [0, 0, 0];
     M.task.forEach((k, i) => { lost[k] = u[i]; });
   }
@@ -439,7 +445,7 @@ const limitQ = (M, q) => q.map((x, i) => {
 
 // ---------------------------------------------------------------- state
 const state = {
-  M: null, q: [], mode: 'fk', target: [0, 0, 0], solver: 'numeric', goal: 0,
+  M: null, q: [], mode: 'fk', target: [0, 0, 0], solver: 'numeric', goal: 0, goalJoint: 0,
   reachable: true, residual: 0, branchFail: false,
   showFrames: true, showLabels: true, showTrail: false, trail: [],
 };
@@ -480,9 +486,11 @@ function descend() {
     const Jp = pinv(J, lam);
     let dq = Jp.map((row) => dot(row, e));
     if (redundant) {
-      // null-space term (I - J^+ J) z with z pulling q1 toward the goal: moves joints, not the effector
+      // null-space term (I - J^+ J) z with z pulling the goal joint toward its goal: moves joints, not the effector
       const P = zeros(q.length, q.length).map((r, i) => r.map((_, j) => (i === j ? 1 : 0) - dot(Jp[i], J.map((jr) => jr[j]))));
-      const z = q.map((_, i) => (i === 0 ? -0.4 * wrap(q[0] - state.goal) : 0));
+      const g = state.goalJoint;
+      const gap = M.joints[g].type === 'revolute' ? wrap(q[g] - state.goal) : q[g] - state.goal;
+      const z = q.map((_, i) => (i === g ? -0.4 * gap : 0));
       dq = add(dq, P.map((r) => dot(r, z)));
     }
     q = limitQ(M, add(q, dq));
@@ -828,6 +836,7 @@ function updateReadouts(F) {
     return [dt, dd];
   }));
   const rows = [['x', fmt(p[0])], ['y', fmt(p[1])], ['z', fmt(p[2])]];
+  if (Math.abs(T[10]) > 1 - 1e-6) rows.push(['tool angle about z₀', `${(Math.atan2(T[4], T[0]) / DEG).toFixed(1)}°`]);
   if (state.mode === 'ik') rows.push(['distance to target', Number.isFinite(state.residual) ? state.residual.toExponential(2) : 'no solution']);
   $('xyz-out').replaceChildren(...rows.flatMap(([k, v]) => {
     const dt = document.createElement('dt'); dt.textContent = k;
@@ -974,15 +983,40 @@ function updateNullCtl() {
   const M = state.M;
   const show = state.solver === 'numeric' && M.joints.length > M.task.length;
   $('null-ctl').hidden = !show;
-  if (show) {
-    state.goal = state.q[0];
-    const r = sliderRow({
-      id: 'goal', sym: subscript(M.joints[0].name), extra: ' goal', kind: 'null-space motion',
-      min: -180, max: 180, step: 0.5, value: state.goal / DEG, digits: 1, unit: '°',
-      onInput: (v) => { state.goal = v * DEG; solveIK(); syncJointControls(); updateScene(); },
-    });
-    $('null-ctl').replaceChildren(r.row);
-  }
+  if (!show) return;
+  if (!M.nullJoints.includes(state.goalJoint)) state.goalJoint = M.nullJoints[0];
+  buildGoalControl();
+}
+// The redundancy is resolved by pulling one joint toward a goal value; the null-space motion keeps the
+// end effector on the target. Any joint that takes part in the motion can be the one.
+function buildGoalControl() {
+  const M = state.M, k = state.goalJoint, j = M.joints[k], rev = j.type === 'revolute';
+  state.goal = state.q[k];
+
+  const pick = document.createElement('div');
+  pick.className = 'choices';
+  const label = document.createElement('label');
+  label.htmlFor = 'goal-joint';
+  label.className = 'desc';
+  label.textContent = 'Redundancy: pull this joint toward its goal while the end effector stays on target';
+  const sel = document.createElement('select');
+  sel.id = 'goal-joint';
+  M.nullJoints.forEach((i) => {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = `${subscript(M.joints[i].name)} (${M.joints[i].type})`;
+    sel.append(o);
+  });
+  sel.value = k;
+  sel.addEventListener('change', () => { state.goalJoint = +sel.value; buildGoalControl(); });
+  pick.append(label, sel);
+
+  const r = sliderRow({
+    id: 'goal', sym: subscript(j.name), extra: ' goal', kind: 'null-space motion',
+    min: rev ? -180 : j.min, max: rev ? 180 : j.max, step: rev ? 0.5 : (j.max - j.min) / 400,
+    value: rev ? state.goal / DEG : state.goal, digits: rev ? 1 : 3, unit: rev ? '°' : '',
+    onInput: (v) => { state.goal = rev ? v * DEG : v; solveIK(); syncJointControls(); updateScene(); },
+  });
+  $('null-ctl').replaceChildren(pick, r.row);
 }
 
 // ---------------------------------------------------------------- singularities

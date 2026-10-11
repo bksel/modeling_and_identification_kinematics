@@ -94,6 +94,19 @@ def manipulator(spec_path: Path) -> str:
     J = simplify_matrix(sp.Matrix([p[k] for k in task]).jacobian(joints), joints)
     singular = singular_data(J, joints, types, consts, q_pose)
 
+    # joints that take part in the null-space motion (J qdot = 0): candidates for the redundancy goal
+    null_joints = []
+    if len(joints) > len(task):
+        J_num = sp.lambdify(joints, J.subs(consts), "numpy")
+        rng2 = np.random.default_rng(2)
+        share = np.zeros(len(joints))
+        for _ in range(40):
+            q = [rng2.uniform(lo, hi) for lo, hi in limits]
+            _, S, Vt = np.linalg.svd(np.asarray(J_num(*q), dtype=float))
+            rank = int((S > 1e-9 * S[0]).sum())
+            share = np.maximum(share, np.abs(Vt[rank:]).max(axis=0))
+        null_joints = [i for i, v in enumerate(share) if v > 0.15]
+
     ik_spec = spec.get("ik", {})
     inter = [(k, js(to_expr(v).subs(consts))) for k, v in ik_spec.get("intermediates", {}).items()]
     branches = []
@@ -112,6 +125,7 @@ def manipulator(spec_path: Path) -> str:
                    for n, q, (lo, hi) in zip(names, joints, limits)],
         "pose": q_pose,
         "task": task,
+        "nullJoints": null_joints,
         "reach": float(max(reach, 1e-3)),
         "size": float(max(size, 1e-3)),
         "z0": 0.0,

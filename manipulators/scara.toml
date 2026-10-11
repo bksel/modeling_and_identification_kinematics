@@ -1,0 +1,52 @@
+name = "SCARA manipulator"
+# figure = "figures/trr.png"
+description = "A planar triple pendulum with a perpendicular prismatic joint with an effector."
+
+joints = ["q1", "q2", "q3", "q4"]
+
+[constants]
+a1 = 10.0
+d1 = 20.0
+d2 = 10.0
+d3 = 10.0
+a2 = 15.0
+a3 = 15.0
+
+[sample]
+q1 = "45*deg"
+q2 = "30*deg"
+q3 = "-40*deg"
+q4 = "0.5"
+
+
+# draw the schematic in the pose of the exercise sheet
+[schematic.pose]
+q1 = "90*deg"
+q2 = "30*deg"
+q3 = "-45*deg"
+q4 = "20"
+
+[[dh]]
+theta = "q1"
+d = "d1"
+a = "a1"
+alpha = "0"
+
+[[dh]]
+theta = "q2"
+d = "d2"
+a = "a2"
+alpha = "0"
+
+[[dh]]
+theta = "q3"
+d = "d3"
+a = "a3"
+alpha = "0"
+
+[[dh]]
+theta = "0"
+d = "q4"
+a = "0"
+alpha = "0"
+

@@ -65,8 +65,10 @@ internet access to load three.js and the fonts. The page has:
 - a manipulator picker and an exclusive **Forward / Inverse** switch
 - **Forward:** a slider per joint
 - **Inverse:** sliders for the target position. Choose a closed-form branch from the spec, or the
-  numeric damped pseudo-inverse. For redundant arms, a *q₁ goal* slider moves the joints through
-  the null space while the end effector stays on the target.
+  numeric damped pseudo-inverse. For redundant arms, pick a *goal joint* (any joint that takes
+  part in the null-space motion) and drag its goal: that joint is pulled toward the goal through
+  the null space while the end effector stays on the target. On a SCARA, choosing q₃ sets the tool
+  angle, which is shown as a readout.
 - toggles for the DH frames, labels and an end-effector trail
 - live joint values, end-effector position, `T_0^n` and the DH table
 - **Singularities:** the factored `det J` with a button for each singular value (e.g. `q₃ = 90°`), a solver
