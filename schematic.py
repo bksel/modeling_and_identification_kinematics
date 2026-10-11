@@ -80,6 +80,26 @@ def _bearing(ax, center, u, s, half):
             ax.plot(*np.array([end, end + sgn * tick * w]).T, color=INK, lw=1.6, zorder=5)
 
 
+def _incoming(o, m, i):
+    """Unit 3-D direction from joint i back along the last non-zero segment of link i-1."""
+    if i < 2:
+        return None
+    for seg in (o[i - 1] - m[i - 2], m[i - 2] - o[i - 2]):
+        if np.linalg.norm(seg) > 1e-9:
+            return -seg / np.linalg.norm(seg)
+    return None
+
+
+def _right_angle(ax, P, corner, v, w, k):
+    """Right-angle mark in the 3-D plane of v and w, projected (so it skews like the drawing).
+    Returns the projected centre of the mark."""
+    pts = [P(corner + k * v), P(corner + k * (v + w)), P(corner + k * w)]
+    ax.plot(*np.array(pts).T, color=INK, lw=0.8, zorder=6)
+    centre = P(corner + 0.5 * k * (v + w))
+    ax.plot(*centre, marker="o", markersize=2.6, color=INK, zorder=6)
+    return centre
+
+
 def _leader(ax, label_at, target, target_r, s):
     """Thin leader from just outside the label text to the target (dot when it ends on a line)."""
     d = target - label_at
@@ -258,6 +278,11 @@ def draw_schematic(frames, joints: list[JointInfo], path: Path, view="auto", bas
                 shift = d_sign * half if (i == 1 and d_len > 1e-9) else 0.0
                 c = P(center3 + shift * f[:3, 2])
                 _bearing(ax, c, u, s, half)
+                v = _incoming(o, m, i)
+                z_out = f[:3, 2] * d_sign
+                if v is not None and abs(np.dot(v, z_out)) < 1e-6:
+                    corner = _right_angle(ax, P, center3, v, z_out, 1.3 * s)
+                    obstacles.append((corner, 0.9 * s))
                 u_d = u * d_sign
                 side = _perp(u) * (-1 if _perp(u)[0] > 0 else 1)
                 place([c - (half + 1.2 * s) * u_d, c + 1.8 * s * side, c - 1.8 * s * side], j.label,

@@ -19,7 +19,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 import kinematics_lib as kin  # noqa: E402
+from render3d import render_3d  # noqa: E402
 from schematic import JointInfo, draw_schematic  # noqa: E402
+from singularities import analyse as analyse_singularities  # noqa: E402
 
 COORDS = [sp.Symbol(n, real=True) for n in ("x", "y", "z")]
 
@@ -109,7 +111,9 @@ def fmt(v: float, digits=4) -> str:
 
 def fmt_joint(v: float, kind: str) -> str:
     if kind == "revolute":
-        deg = np.degrees((v + np.pi) % (2 * np.pi) - np.pi)
+        deg = round(float(np.degrees(np.arctan2(np.sin(v), np.cos(v)))), 2) + 0.0   # no "-0.00"
+        if deg <= -179.995:
+            deg = 180.0                                              # pi and -pi: show +180
         return f"{deg:.2f}°"
     return fmt(v)
 
@@ -243,6 +247,38 @@ def _equal_limits(ax, pts, planar, pad):
         ax.set_zlabel("$z_0$")
 
 
+# ---------------------------------------------------------------- singularities
+
+def singular_doc(sg, joints, types, lx, coords) -> dict:
+    """Singularity analysis (singularities.analyse) in the form walkthrough.typ renders."""
+    def vec(v):
+        return "(" + ", ".join(fmt(float(x) + 0.0, 3) for x in v) + ")"   # + 0.0 turns -0.0 into 0.0
+
+    def example(ex):
+        q, u, v = ex
+        return {"q": [{"name": sp.latex(j), "value": fmt_joint(float(val), types[j])} for j, val in zip(joints, q)],
+                "lost": vec(u) if u is not None else None, "still": vec(v) if v is not None else None}
+
+    def family(it):
+        solution = None
+        if it["solutions"] is not None:
+            solution = sp.latex(it["joints"][0]) + r" \in " + sp.latex(it["solutions"])
+        return {"cond": lx(it["f"]), "joints": [sp.latex(q) for q in it["joints"]], "solution": solution,
+                "examples": [example(e) for e in it["examples"]]}
+
+    out = {"kind": sg["kind"], "m": sg["m"], "n": sg["n"], "na": len(sg["active"]), "coords": coords,
+           "joint_names": [sp.latex(j) for j in joints],
+           "idle": [sp.latex(q) for q in sg["idle"]],
+           "active": [sp.latex(joints[j]) for j in sg["active"]],
+           "factors": [family(it) for it in sg["factors"]]}
+    if sg["kind"] == "square":
+        out["det"] = lx(sg["det"])
+    else:
+        out.update(k=sg["k"], by=sg["by"], minors=[lx(mn) for mn in sg["minors"]],
+                   example=example(sg["example"]) if sg["example"] is not None else None)
+    return out
+
+
 # ---------------------------------------------------------------- schematic
 
 def render_schematic(spec, transforms, joints, types, consts, path: Path, totals=None):
@@ -261,6 +297,7 @@ def render_schematic(spec, transforms, joints, types, consts, path: Path, totals
                       d_label=label(t.d), a_label=label(t.l))
             for j, t in zip(joints, transforms)]
     draw_schematic(frames, info, path, view=opts.get("view", "auto"))
+    render_3d(frames, [types[j] for j in joints], [sp.latex(j) for j in joints], path.with_name("model3d.svg"))
 
 
 def load(spec_path: Path):
@@ -322,6 +359,8 @@ def build(spec_path: Path, out_dir: Path, rel_root: Path) -> dict:
         return np.array([f[:3, 3] for f in frames_at(q)])
 
     q_sample = np.array([to_float(spec["sample"][q.name]) for q in joints])
+    singular = singular_doc(analyse_singularities(J, joints, types, consts, q_sample), joints, types, lx,
+                            [sp.latex(c) for c in task_coords])
     out_dir.mkdir(parents=True, exist_ok=True)
     plot_frames(frames_at(q_sample), out_dir / "frames.svg")
     render_schematic(spec, transforms, joints, types, consts, out_dir / "schematic.svg", totals)
@@ -415,12 +454,13 @@ def build(spec_path: Path, out_dir: Path, rel_root: Path) -> dict:
         "position": {"coords": sp.latex(sp.Matrix(COORDS)), "expr": lx(p)},
         "task_space": {"m": m, "n": n, "coords": [sp.latex(c) for c in task_coords], "fixed": fixed_coords},
         "jacobian": {"p": lx(p_task), "q": sp.latex(sp.Matrix(joints)), "J": lx(J)},
+        "singular": singular,
         "sample": {
             "q": [{"name": sp.latex(q), "value": fmt_joint(v, types[q])} for q, v in zip(joints, q_sample)],
             "target": [{"name": sp.latex(c), "value": fmt(v)} for c, v in zip(COORDS, target_full)],
         },
         "figures": {"frames": rel(out_dir / "frames.svg"), "ik": rel(out_dir / "ik.svg"),
-                    "schematic": rel(out_dir / "schematic.svg")},
+                    "schematic": rel(out_dir / "schematic.svg"), "model3d": rel(out_dir / "model3d.svg")},
         "ik": {"closed": closed, "numeric": numeric},
         "legend": [{"short": k, "full": v} for k, v in sorted(lx.legend.items(), key=lambda kv: (len(kv[0]), kv[0]))],
     }

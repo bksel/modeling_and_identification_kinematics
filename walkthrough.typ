@@ -36,15 +36,17 @@
 = Manipulator and DH table
 
 #if data.figure != none [
-  #figure(
-    grid(columns: 2, gutter: 1em, align: horizon,
-      image(data.figure, width: 100%), image(data.figures.schematic, width: 100%)),
-    caption: [Left: the manipulator as given. Right: schematic drawn from the DH table below —
-      the two should show the same structure.],
-  )
-] else [
-  #figure(image(data.figures.schematic, width: 65%), caption: [Kinematic schematic drawn from the DH table.])
+  #figure(image(data.figure, width: 55%),
+    caption: [The manipulator as given; compare with the generated drawings below.])
 ]
+
+#figure(
+  grid(columns: 2, gutter: 0.8em, align: horizon,
+    image(data.figures.schematic, width: 100%), image(data.figures.model3d, width: 100%)),
+  caption: [Left: kinematic schematic drawn from the DH table. Right: 3-D view of the same pose
+    (revolute joints blue, prismatic orange; dashed lines drop to the $X_0 Y_0$ plane, the grey trace
+    is the arm's projection onto it).],
+)
 
 The manipulator has #data.joints.len() joints. Joint variables:
 #list(..data.joints.map(j => [#mi(j.name) — #j.type]))
@@ -134,6 +136,83 @@ Differentiating the task-space position with respect to the joint variables give
 Jacobian used by the numeric inverse kinematics:
 #mitex("J(q) = \\frac{\\partial p}{\\partial q}, \\quad p = " + data.jacobian.p + ", \\quad q = " + data.jacobian.q)
 #mitex("J(q) = " + data.jacobian.J)
+
+// ---------------------------------------------------------------- singularities
+= Singular configurations
+
+#let sg = data.singular
+A configuration is singular when $J(q)$ loses rank. The end effector then cannot move in some
+direction, however fast the joints turn, and some joint motion leaves it in place.
+
+#if sg.idle.len() > 0 [
+  #note[
+    *Joints that never move the end effector.* The column of $J$ for
+    #sg.idle.map(mi).join([, ]) is identically zero, so these joints only change the orientation of
+    the end effector, never its position. The analysis below uses #sg.active.map(mi).join([, ]).
+  ]
+]
+
+#let tuple(names) = mi("(" + names.join(", ") + ")")
+#let pose-table(rows) = table(
+  columns: (auto, 1fr, 1fr), align: (left, center, center), stroke: none, inset: 5pt,
+  table.hline(),
+  table.header([*Configuration*], [*Cannot move along* #tuple(sg.coords)],
+    [*Joint motion that leaves it in place* #tuple(sg.joint_names)]),
+  table.hline(stroke: 0.5pt),
+  ..rows.map(r => (
+    r.q.map(v => [#mi(v.name) $=$ #v.value]).join([, ]),
+    if r.lost == none { [not unique] } else { raw(r.lost) },
+    if r.still == none { [not unique] } else { raw(r.still) },
+  )).flatten(),
+  table.hline(),
+)
+#let uniqueness-note = if sg.kind == "minors" and sg.by == "rows" [
+  With fewer moving joints than coordinates, the effector already cannot reach every direction, and at
+  a singularity it loses one more, so the lost direction is not unique. The joint motion is.
+] else if sg.kind == "minors" [
+  A redundant arm can always move its joints without moving the effector (self-motion), so that
+  motion is not unique. The lost direction is.
+]
+
+#let families(fs) = for (i, f) in fs.enumerate() [
+  == Family #(i + 1): #mi(f.cond + " = 0")
+  #if f.solution != none [
+    Solving for the joint: #mi(f.solution).
+  ] else [
+    This condition couples #f.joints.map(mi).join([, ]). An example is found numerically by solving
+    it for one of them while the others keep their sample values.
+  ]
+  #if f.examples.len() > 0 { pose-table(f.examples) }
+]
+
+#uniqueness-note
+
+#if sg.kind == "square" [
+  $J$ is square, so it is singular exactly where its determinant vanishes:
+  #mitex("\\det J(q) = " + sg.det)
+  #if sg.factors.len() == 0 [
+    The determinant has no factor that depends on the joints, so the manipulator has no singular
+    configurations.
+  ] else [
+    Every factor that depends on the joints gives one family of singular configurations. In the
+    examples, the other joints keep their sample values.
+    #families(sg.factors)
+  ]
+] else [
+  $J$ has #sg.m rows but #sg.na moving joints, so it is not square. It loses rank exactly when every
+  #(sg.k)×#(sg.k) minor vanishes. By the Cauchy–Binet formula, the Gram determinant
+  (#if sg.by == "columns" [$det(J J^T)$] else [$det(J^T J)$]) is the sum of their squares. The minors are:
+  #for mn in sg.minors { mitex(mn) }
+  #if sg.factors.len() > 0 [
+    All the minors share a factor, so each of its zeros makes them vanish at once:
+    #families(sg.factors)
+  ]
+  #if sg.example != none [
+    *Numerical example.* Gradient descent on the product of the #sg.k largest singular values,
+    started from the sample configuration, ends at
+    #pose-table((sg.example,))
+  ]
+]
 
 // ---------------------------------------------------------------- IK
 = Inverse kinematics

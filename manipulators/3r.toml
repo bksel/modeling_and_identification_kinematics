@@ -1,0 +1,40 @@
+name = "3R manipulator"
+# figure = "figures/trr.png"
+description = "A rotational joint q1 along the vertical z0 axis, followed by two revolute joints: q2 perpendicular to the link a1, and q3 also perpendicular to the link a2."
+
+joints = ["q1", "q2", "q3"]
+
+[constants]
+a1 = 1.0
+a2 = 0.8
+a3 = 0.8
+
+
+[sample]
+q1 = "1.0"
+q2 = "30*deg"
+q3 = "-40*deg"
+
+# draw the schematic in the pose of the exercise sheet
+[schematic.pose]
+q1 = "45*deg"
+q2 = "30*deg"
+q3 = "-25*deg"
+
+[[dh]]
+theta = "q1"
+d = "a1"
+a = "0"
+alpha = "-pi/2"
+
+[[dh]]
+theta = "q2"
+d = "a2"
+a = "0"
+alpha = "pi/2"
+
+[[dh]]
+theta = "q3"
+d = "a3"
+a = "0"
+alpha = "0"
